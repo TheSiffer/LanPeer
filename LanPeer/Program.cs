@@ -6,4 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
         .ConfigureServices((context, services) =>
         {
             services.AddHostedService<DiscoveryWorker>();
+            services.AddHostedService<PeerHandshake>();
+            services.AddHostedService<DataHandler>();
         }).Build().Run();
