@@ -1,4 +1,5 @@
 using LanPeer;
+using LanPeer.Interfaces;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 
@@ -11,6 +12,8 @@ builder.Services.AddHostedService<DataHandler>();
 builder.Services.AddHostedService<Worker>();
 
 builder.Services.AddControllers();
+
+builder.Services.AddScoped<IDataHandler, DataHandler>();
 
 builder.WebHost.ConfigureKestrel(options =>
 {
