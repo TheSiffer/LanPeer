@@ -1,11 +1,29 @@
-﻿using LanPeer;
-using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.Extensions.Hosting;
+using LanPeer;
+using LanPeer.Interfaces;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 
-    Host.CreateDefaultBuilder(args)
-        .ConfigureServices((context, services) =>
-        {
-            services.AddHostedService<DiscoveryWorker>();
-            services.AddHostedService<PeerHandshake>();
-            services.AddHostedService<DataHandler>();
-        }).Build().Run();
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services
+builder.Services.AddHostedService<DiscoveryWorker>();
+builder.Services.AddHostedService<PeerHandshake>();
+builder.Services.AddHostedService<DataHandler>();
+builder.Services.AddHostedService<Worker>();
+
+builder.Services.AddControllers();
+
+builder.Services.AddScoped<IDataHandler, DataHandler>();
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenLocalhost(5000); // <-- API will be at http://127.0.0.1:5000
+});
+
+
+var app = builder.Build();
+
+// Map controllers
+app.MapControllers();
+
+app.Run();

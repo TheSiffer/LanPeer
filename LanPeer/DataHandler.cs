@@ -1,14 +1,13 @@
 ﻿using LanPeer.DataModels;
 using LanPeer.DataModels.Data;
-using Microsoft.Extensions.Hosting;
-using System.IO;
-using System.Net.Sockets;
+using LanPeer.Helpers;
+using LanPeer.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace LanPeer
 {
-    internal sealed class DataHandler : BackgroundService
+    internal sealed class DataHandler : BackgroundService , IDataHandler
     {
         private readonly Stream _stream;
 
@@ -20,6 +19,8 @@ namespace LanPeer
         public static DataHandler? Instance { get; private set; }
 
         private static Queue<FileTransferItem> fileQueue = new Queue<FileTransferItem>();
+
+        private CancellationToken token;
 
         private DataHandler(Stream stream)
         {
@@ -38,7 +39,7 @@ namespace LanPeer
             }
         }
 
-        public string GetActiveTranferId()
+        public string GetActiveTransferId()
         {
             return transferId;
         }
@@ -48,12 +49,21 @@ namespace LanPeer
             bufferSize = size;
         }
 
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        public int GetBufferSize()
         {
-            throw new NotImplementedException();
+            return bufferSize;
         }
 
-        public async Task SendFilesAsync(CancellationToken token)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            token = stoppingToken;
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+
+        public async Task SendFilesAsync()
         {
             if (_stream == null)
             {
@@ -112,20 +122,32 @@ namespace LanPeer
                     using (var fileStream = File.OpenRead(fullPath))
                     {
                         int bytesRead;
-
-                        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
+                        ChunkPacket packet;
+                        bool IsCancelled = false;
+                        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0) //removed token passing into read
                         {
-                            var packet = new ChunkPacket
+                            if (token.IsCancellationRequested)
                             {
-                                TransferId = transferId,
-                                ChunkIndex = chunkIndex,
-                                TotalChunks = totalChunks,
-                                state = file.State,
-                                Data = buffer.Take(bytesRead).ToArray()
-                            };
-
-                            byte[] packed = Serialize(packet);
-                            await _stream.WriteAsync(packed, 0, packed.Length, token);
+                                CreateFailPacket(out packet);
+                                IsCancelled = true;
+                            }
+                            else
+                            {
+                                packet = new ChunkPacket
+                                {
+                                    TransferId = transferId,
+                                    ChunkIndex = chunkIndex,
+                                    TotalChunks = totalChunks,
+                                    state = file.State,
+                                    Data = buffer.Take(bytesRead).ToArray()
+                                };
+                            }
+                            byte[] packed = packet.Serialize();
+                            await _stream.WriteAsync(packed, 0, packed.Length); //removed token passing into write
+                            if (IsCancelled)
+                            {
+                                throw new OperationCanceledException();
+                            }
                             chunkIndex++;
                         }
 
@@ -140,15 +162,15 @@ namespace LanPeer
                         state = file.State,
                         Data = Array.Empty<byte>()
                     };
-                    byte[] endPacked = Serialize(endPacket);
+                    byte[] endPacked = endPacket.Serialize();
                     await _stream.WriteAsync(endPacked, 0, endPacked.Length, token);
                     await _stream.FlushAsync();
                     file.IsSent = true;
 
                     using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-                    string? ack = await reader.ReadLineAsync();
+                    var ackPacket = _stream.DeserializeAck();
 
-                    if(ack?.StartsWith("ACK") == true)
+                    if(ackPacket.State == TransferState.Verified)
                     {
                         Console.WriteLine($"[SendFile] Receiver confirmed file {file.FileName}");
                         file.IsVerified = true;
@@ -160,7 +182,11 @@ namespace LanPeer
                         file.IsVerified = false;
                         file.State = TransferState.Failed;
                     }
-                    
+                    Console.WriteLine($"[SendFile] Completed sending {fileName} ({fileSize} bytes). Hash: {fileHash}");
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine("Application exit requested. Failure packet sent. Exiting...");
                 }
                 catch (Exception ex)
                 {
@@ -170,60 +196,19 @@ namespace LanPeer
                 {
                     await _stream.FlushAsync();
                 }
-                Console.WriteLine($"[SendFile] Completed sending {fileName} ({fileSize} bytes). Hash: {fileHash}");
-
             }
         }
-        public static byte[] Serialize(ChunkPacket packet)
+
+        private void CreateFailPacket(out ChunkPacket packet)
         {
-            using (var ms = new MemoryStream())
-            using (var bw = new BinaryWriter(ms, Encoding.UTF8, true))
+            packet = new ChunkPacket
             {
-                bw.Write(packet.TransferId);
-                bw.Write(packet.ChunkIndex);
-                bw.Write(packet.TotalChunks);
-                bw.Write((int)packet.state);
-
-                bw.Write(packet.Data.Length);
-                bw.Write(packet.Data);
-
-                byte[] payload = ms.ToArray();
-
-                using (var finalStream = new MemoryStream())
-                using(var finalWriter = new BinaryWriter(finalStream))
-                {
-                    finalWriter.Write(payload.Length);
-                    finalWriter.Write(payload);
-                    return finalStream.ToArray();
-                }
-            }
+                TransferId = Guid.Empty.ToString(),
+                ChunkIndex = 0,
+                TotalChunks = 0,
+                state = TransferState.Failed,
+                Data = Array.Empty<byte>(),
+            };
         }
-        public static ChunkPacket Deserialize(NetworkStream stream)
-        {
-            using (var br = new BinaryReader(stream, Encoding.UTF8, true))
-            {
-                int length = br.ReadInt32();
-
-                byte[] payload = br.ReadBytes(length);
-
-                using (var ms = new MemoryStream(payload))
-                using (var pr = new BinaryReader(ms, Encoding.UTF8, true))
-                {
-                    var packet = new ChunkPacket
-                    {
-                        TransferId = pr.ReadInt32().ToString(),
-                        ChunkIndex = br.ReadInt32(),
-                        TotalChunks = br.ReadInt32(),
-                        state = (TransferState)pr.ReadInt32()
-                    };
-
-                    int dataLength = pr.ReadInt32();
-                    packet.Data = pr.ReadBytes(dataLength);
-
-                    return packet;
-                }
-            }
-        }
-
     }
 }
