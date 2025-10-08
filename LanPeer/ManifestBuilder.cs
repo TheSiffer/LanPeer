@@ -79,5 +79,24 @@ namespace LanPeer
             var json = JsonSerializer.Serialize(manifestRoot, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(outputFile, json);
         }
+        public static List<ManifestNode> Flatten(ManifestNode root)
+        {
+            var flatList = new List<ManifestNode>();
+            FlattenRecursive(root, flatList);
+            return flatList;
+        }
+
+        private static void FlattenRecursive(ManifestNode node, List<ManifestNode> list)
+        {
+            if (!node.IsFolder)
+            {
+                list.Add(node);
+            }
+            else if (node.Children != null)
+            {
+                foreach (var child in node.Children)
+                    FlattenRecursive(child, list);
+            }
+        }
     }
 }
