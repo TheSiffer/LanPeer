@@ -1,19 +1,25 @@
 using LanPeer;
 using LanPeer.Interfaces;
+using LanPeer.Workers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Singleton declarations
+builder.Services.AddSingleton<IDiscoveryWorker, DiscoveryWorker>();
+builder.Services.AddSingleton<IDataHandler, DataHandler>();
+
 // Add services
-builder.Services.AddHostedService<DiscoveryWorker>();
+builder.Services.AddHostedService(provider => (DiscoveryWorker)provider.GetRequiredService<IDiscoveryWorker>());
 builder.Services.AddHostedService<PeerHandshake>();
-builder.Services.AddHostedService<DataHandler>();
+builder.Services.AddHostedService(provider => (DataHandler)provider.GetRequiredService<IDataHandler>());
 builder.Services.AddHostedService<Worker>();
 
 builder.Services.AddControllers();
 
 builder.Services.AddScoped<IDataHandler, DataHandler>();
+
 
 builder.WebHost.ConfigureKestrel(options =>
 {

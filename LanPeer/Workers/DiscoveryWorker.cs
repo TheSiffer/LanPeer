@@ -1,15 +1,18 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using LanPeer.Interfaces;
+using Microsoft.Extensions.Hosting;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace LanPeer
+namespace LanPeer.Workers
 {
-   public class DiscoveryWorker : BackgroundService
+   public class DiscoveryWorker : BackgroundService , IDiscoveryWorker
     {
-        private const int DiscoveryPort = 50000;
+        private const int DiscoveryPort = 50000; //this is the discovery port and it is set in stone.
         private string DiscoveryMessage;
         private readonly Dictionary<string, DateTime> _peerHeartbeats = new(); //keyvalue pairs Ip-timestamp
+        public event Action<string>? PeerDiscovered;
+        public event Action<string>? PeerLost;
 
         private string myId;
 
@@ -18,6 +21,11 @@ namespace LanPeer
         {
             myId = Guid.NewGuid().ToString();
             DiscoveryMessage = $"LanTransfer-Discovery {myId}";
+        }
+
+        public Dictionary<string, DateTime> GetPeers()
+        {
+            return _peerHeartbeats;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -75,6 +83,7 @@ namespace LanPeer
 
                             if (isNew)
                             {
+                                PeerDiscovered?.Invoke(peerAddress);
                                 Console.WriteLine($"Discovered new peer: {peerAddress}, {DiscoveryMessage}");
                             }
                         }
@@ -97,6 +106,7 @@ namespace LanPeer
                     foreach (var peer in inactivePeers)
                     {
                         _peerHeartbeats.Remove(peer);
+                        PeerLost?.Invoke(peer);
                         Console.WriteLine($"Peer removed (inactive): {peer}");
                     }
                 }

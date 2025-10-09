@@ -1,0 +1,9 @@
+echo oldemail@work.com==newemail@personal.com
+
+git filter-repo --name-callback '
+    return b"Saim Khan"
+' --email-callback '
+    return b"saimkhank23v@gmail.com"
+'
+
+git filter-repo --name-callback "return b'Saim Khan'" --email-callback "return b'saimkhan@email.com'"

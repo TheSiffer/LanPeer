@@ -5,11 +5,11 @@ using LanPeer.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace LanPeer
+namespace LanPeer.Workers
 {
     internal sealed class DataHandler : BackgroundService , IDataHandler
     {
-        private readonly Stream _stream;
+        private Stream? _stream;
 
         private static readonly object _lock = new object();
 
@@ -22,21 +22,11 @@ namespace LanPeer
 
         private CancellationToken token;
 
-        private DataHandler(Stream stream)
+        public DataHandler() { }
+
+        public void SetStream(Stream stream)
         {
             _stream = stream;
-        }
-
-        public static DataHandler GetDataHandler(Stream stream)
-        {
-            lock (_lock)
-            {
-                if (Instance == null)
-                {
-                    Instance = new DataHandler(stream);
-                }
-                return Instance;
-            }
         }
 
         public string GetActiveTransferId()
@@ -72,7 +62,7 @@ namespace LanPeer
             FileTransferItem item;
 
             //iterate over items in queue
-            foreach (FileTransferItem file in fileQueue)
+            foreach (FileTransferItem file in QueueManager.Instance.GetFileQueue())
             {
                 if (file.IsSent)
                 {
@@ -84,12 +74,12 @@ namespace LanPeer
 
                 int chunkIndex = 0;
                 string fileName = file.FileName;
-                string relPath = file.RelativePath;
+                string relPath = file.DestPath;
                 string fullPath = file.FullPath;
                 TransferState fileState = file.State;
                 string fileHash;
-                long fileSize = file.Size;
-                long totalChunks = (file.Size + bufferSize - 1) / bufferSize; //number of chunks
+                long fileSize = file.FileSize;
+                long totalChunks = (file.FileSize + bufferSize - 1) / bufferSize; //number of chunks
 
                 //compute hash
                 using (var sha = SHA256.Create())
