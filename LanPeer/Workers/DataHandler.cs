@@ -5,7 +5,7 @@ using LanPeer.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace LanPeer
+namespace LanPeer.Workers
 {
     internal sealed class DataHandler : BackgroundService , IDataHandler
     {

@@ -21,7 +21,7 @@ namespace LanPeer
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var start = StartAsync(stoppingToken);
+            await StartAsync(stoppingToken);
         }
 
         public PeerHandshake() // add peerid parameter

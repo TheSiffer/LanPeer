@@ -4,10 +4,16 @@ using System.Security.Cryptography;
 using System.Text.Json;
 
 
-namespace LanPeer
+namespace LanPeer.Utility
 {
     public static class ManifestBuilder
     {
+        /// <summary>
+        /// Reads the filepath and builds a manifest node json of the hierarchy of the folder/file
+        /// </summary>
+        /// <param name="inputPath">the path to the file or folder</param>
+        /// <returns></returns>
+        /// <exception cref="FileNotFoundException">No folder or files exist in path.</exception>
         public static ManifestNode Build(string inputPath)
         {
             if (File.Exists(inputPath))
@@ -79,6 +85,11 @@ namespace LanPeer
             var json = JsonSerializer.Serialize(manifestRoot, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(outputFile, json);
         }
+        /// <summary>
+        /// Flattens the manifest node hierarchy into a manifest node list
+        /// </summary>
+        /// <param name="root">the root node</param>
+        /// <returns>Flattened list</returns>
         public static List<ManifestNode> Flatten(ManifestNode root)
         {
             var flatList = new List<ManifestNode>();

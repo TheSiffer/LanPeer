@@ -9,7 +9,7 @@ namespace LanPeer.DataModels
 {
     public class AckPacket
     {
-        public string TransferId { get; set; }
+        public string TransferId { get; set; } = "";
         public TransferState State { get; set; }
     }
 }

@@ -18,7 +18,7 @@ namespace LanPeer
         public CodeManager()
         {
             timer = new System.Timers.Timer(15000);
-            //timer.Elapsed += (s, e) => GenerateNewCode();
+            timer.Elapsed += (s, e) => GenerateNewCode();
             timer.AutoReset = true;
             timer.Start();
         }
