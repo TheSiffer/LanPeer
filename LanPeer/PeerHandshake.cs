@@ -123,7 +123,7 @@ namespace LanPeer
             RequestType reqType = RequestType.NewConnection;
             bool inbound = false;
             string challengecode;
-            challengecode = CodeManager.instance.GetCode();
+            challengecode = "fuck";//CodeManager.instance.GetCode();
 
             switch (request.Type)
             {

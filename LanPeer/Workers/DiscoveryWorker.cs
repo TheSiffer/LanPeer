@@ -1,11 +1,13 @@
 ﻿using LanPeer.Interfaces;
-using Microsoft.Extensions.Hosting;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
 namespace LanPeer.Workers
 {
+    /// <summary>
+    /// Background service runs discovery on port 50000.
+    /// </summary>
    public class DiscoveryWorker : BackgroundService , IDiscoveryWorker
     {
         private const int DiscoveryPort = 50000; //this is the discovery port and it is set in stone.
@@ -57,7 +59,7 @@ namespace LanPeer.Workers
                 //for debug
                 await udpClient.SendAsync(data, data.Length, new IPEndPoint(IPAddress.Loopback, 9000));
 
-                await Task.Delay(TimeSpan.FromSeconds(3), token);
+                await Task.Delay(TimeSpan.FromSeconds(10), token); //annoying 3 second interval before this
             }
         }
 
