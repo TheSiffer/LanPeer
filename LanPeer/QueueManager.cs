@@ -1,18 +1,29 @@
 ﻿using LanPeer.DataModels;
+using LanPeer.Interfaces;
 using LanPeer.Utility;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace LanPeer
 {
-    public class QueueManager 
-    { 
-        private static readonly Lazy<QueueManager> _instance = new(() => new QueueManager());
-        public static QueueManager Instance => _instance.Value; //global accessor
+    /// <summary>
+    /// File Queue and Peer List Manager Singleton class with Lazy init. Contains global access points to both Data Structures.
+    /// Implements IQueueManager
+    /// </summary>
+    public class QueueManager : IQueueManager
+    {
+        //private static QueueManager? _instance; //= new(() => new QueueManager());
+        //public static QueueManager Instance => _instance ?? throw new InvalidOperationException("Not Instantiated"); //=> _instance.Value; //global accessor
         private readonly ConcurrentQueue<FileTransferItem> _fileQueue = new();
+        private List<Peer> _peers = new();
 
-        private QueueManager() { }
+        //public QueueManager() { }
 
+        /// <summary>
+        /// Adds a file or folder to the send queue
+        /// </summary>
+        /// <param name="filePath">Location of the file to enqueue</param>
+        /// <returns></returns>
         public async Task EnQueue(string filePath)
         {
             var manifest = ManifestBuilder.Build(filePath);
@@ -38,6 +49,36 @@ namespace LanPeer
         public ConcurrentQueue<FileTransferItem> GetFileQueue()
         {
             return _fileQueue;
+        }
+
+        public bool PeerExists(Peer peer)
+        {
+            return _peers.Contains(peer);
+        }
+
+        public List<Peer> GetSavedPeers()
+        {
+            return _peers;
+        }
+
+        public void LoadPeersfromSave(List<Peer> peers)
+        {
+            _peers = peers;
+        }
+        
+        public void AddPeer(Peer peer)
+        {
+            if(peer != null)
+                _peers.Add(peer);   
+        }
+        
+        public bool DeletePeer(Peer peer)
+        {
+            if (_peers.Remove(peer))
+            {
+                return true;
+            }
+            return false;
         }
     }
 }

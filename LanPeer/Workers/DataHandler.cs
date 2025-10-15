@@ -10,23 +10,35 @@ namespace LanPeer.Workers
     internal sealed class DataHandler : BackgroundService , IDataHandler
     {
         private Stream? _stream;
-
-        private static readonly object _lock = new object();
-
+        private readonly object _lock = new();
         private int bufferSize = 81920; // defaulted to ~80kb
-
-        private string transferId;
-        public static DataHandler? Instance { get; private set; }
+        private string transferId = string.Empty;
+        private readonly IQueueManager _queueManager;
 
         private static Queue<FileTransferItem> fileQueue = new Queue<FileTransferItem>();
 
         private CancellationToken token;
 
-        public DataHandler() { }
+        public DataHandler(IQueueManager queueManager)
+        {
+            _queueManager = queueManager;
+            //Instance = this;
+        }
 
         public void SetStream(Stream stream)
         {
-            _stream = stream;
+            lock (_lock)
+            {
+                if(_stream != null)
+                {
+                    try
+                    {
+                        _stream.Dispose();
+                    }
+                    catch { }
+                }
+                _stream = stream;
+            }
         }
 
         public string GetActiveTransferId()
@@ -62,7 +74,7 @@ namespace LanPeer.Workers
             FileTransferItem item;
 
             //iterate over items in queue
-            foreach (FileTransferItem file in QueueManager.Instance.GetFileQueue())
+            foreach (FileTransferItem file in _queueManager.GetFileQueue())
             {
                 if (file.IsSent)
                 {
