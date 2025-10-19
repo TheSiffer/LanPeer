@@ -8,7 +8,7 @@ namespace LanPeer.Interfaces
 {
     public interface ICodeManager
     {
-        public string ForceRegenerate();
+        public Task<string> ForceRegenerate();
         public bool Validate(string code);
         public string? GetCode();
     }

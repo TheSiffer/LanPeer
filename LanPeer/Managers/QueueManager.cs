@@ -4,10 +4,10 @@ using LanPeer.Utility;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
-namespace LanPeer
+namespace LanPeer.Managers
 {
     /// <summary>
-    /// File Queue and Peer List Manager Singleton class with Lazy init. Contains global access points to both Data Structures.
+    /// File Queue and Peer List Manager Singleton class with Lazy init. Contains access points to both Data Structures.
     /// Implements IQueueManager
     /// </summary>
     public class QueueManager : IQueueManager

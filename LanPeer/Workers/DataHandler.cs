@@ -9,6 +9,10 @@ namespace LanPeer.Workers
 {
     internal sealed class DataHandler : BackgroundService , IDataHandler
     {
+        /// <summary>
+        /// Stream will only be set by the connection manager
+        /// Only the connection manager listens for incoming requests and sends connection requests.
+        /// </summary>
         private Stream? _stream;
         private readonly object _lock = new();
         private int bufferSize = 81920; // defaulted to ~80kb
@@ -65,6 +69,11 @@ namespace LanPeer.Workers
             }
         }
 
+        /// <summary>
+        /// Starts sending all files one at a time from the queue.
+        /// </summary>
+        /// <returns>Task</returns>
+        /// <exception cref="InvalidOperationException"></exception>
         public async Task SendFilesAsync()
         {
             if (_stream == null)

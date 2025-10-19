@@ -31,12 +31,12 @@ namespace LanPeer
         }
 
         [HttpGet("forceregen")]
-        public IActionResult ForceRegenerateCode()
+        public async Task<IActionResult> ForceRegenerateCode()
         {
             string code = string.Empty;
             try
             {
-                code = codeManager.ForceRegenerate();
+                code = await codeManager.ForceRegenerate();
             }
             catch (Exception ex)
             {
@@ -79,18 +79,21 @@ namespace LanPeer
             }
             return BadRequest();
         }
+
         [HttpPost("size")]
         public IActionResult SetBufferSize(int size)
         {
             dataHandler.SetBufferSize(size);
             return Ok();
         }
+
         [HttpGet("buffersize")]
         public IActionResult GetBufferSize()
         {
             int size = dataHandler.GetBufferSize();
             return Ok(size);
         }
+
         [HttpPost("begintransfer")]
         public async Task<IActionResult> SendFilesAsync()
         {

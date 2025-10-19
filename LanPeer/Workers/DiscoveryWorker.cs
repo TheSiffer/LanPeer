@@ -1,33 +1,51 @@
-﻿using LanPeer.Interfaces;
+﻿using LanPeer.DataModels;
+using LanPeer.Interfaces;
+using Microsoft.AspNetCore.Mvc.Formatters;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 
 namespace LanPeer.Workers
 {
     /// <summary>
     /// Background service runs discovery on port 50000.
     /// </summary>
-   public class DiscoveryWorker : BackgroundService , IDiscoveryWorker
+    public class DiscoveryWorker : BackgroundService, IDiscoveryWorker
     {
         private const int DiscoveryPort = 50000; //this is the discovery port and it is set in stone.
-        private string DiscoveryMessage;
-        private readonly Dictionary<string, DateTime> _peerHeartbeats = new(); //keyvalue pairs Ip-timestamp
-        public event Action<string>? PeerDiscovered;
-        public event Action<string>? PeerLost;
+        //private string DiscoveryMessage;
+        private BroadcastData DiscoveryMessage;
+        private readonly List<BroadcastData> _peerHeartbeats = new(); //keyvalue pairs Ip-timestamp
+        //private readonly List<BroadcastData> peers = new();
+        public event Action<BroadcastData>? PeerDiscovered;
+        public event Action<BroadcastData>? PeerLost;
 
-        private string myId;
+        public readonly string myId;
 
         //for debugging
         public DiscoveryWorker()
         {
             myId = Guid.NewGuid().ToString();
-            DiscoveryMessage = $"LanTransfer-Discovery {myId}";
+            DiscoveryMessage = new BroadcastData()
+            {
+                Id = myId,
+                Name = Environment.MachineName,
+                OS = Environment.OSVersion.ToString(),
+                address = GetLocalAddress() ?? new string("0.0.0.0")
+            };
+
+            //DiscoveryMessage = $"LanTransfer-Discovery {myId}";
         }
 
-        public Dictionary<string, DateTime> GetPeers()
+        public List<BroadcastData> GetPeers()
         {
             return _peerHeartbeats;
+        }
+
+        public string GetMyId()
+        {
+            return myId;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -42,56 +60,89 @@ namespace LanPeer.Workers
 
             Console.WriteLine($"Current Session id for this pc: {myId}");
 
+
             await Task.WhenAll(broadcaster, listener, cleaner);
         }
 
         private async Task BroadcastPresence(CancellationToken token)
         {
-            using var udpClient = new UdpClient();
-            udpClient.EnableBroadcast = true;
+            using var udpClient = new UdpClient() { EnableBroadcast = true };
 
-            var data = Encoding.UTF8.GetBytes(DiscoveryMessage);
-
-            while (!token.IsCancellationRequested)
+            try
             {
-                await udpClient.SendAsync(data, data.Length, new IPEndPoint(IPAddress.Broadcast, DiscoveryPort));
-                Console.WriteLine("Broadcasted presence");
-                //for debug
-                await udpClient.SendAsync(data, data.Length, new IPEndPoint(IPAddress.Loopback, 9000));
+                var json = JsonSerializer.Serialize(DiscoveryMessage);
+                var data = Encoding.UTF8.GetBytes(json);
 
-                await Task.Delay(TimeSpan.FromSeconds(10), token); //annoying 3 second interval before this
+                while (!token.IsCancellationRequested)
+                {
+                    await udpClient.SendAsync(data, data.Length, new IPEndPoint(IPAddress.Broadcast, DiscoveryPort)); //add guid here
+                    Console.WriteLine("Broadcasted presence");
+                    //for debug
+                    await udpClient.SendAsync(data, data.Length, new IPEndPoint(IPAddress.Loopback, 9000));
+
+                    await Task.Delay(TimeSpan.FromSeconds(10), token); //annoying 3 second interval before this
+                }
+                udpClient.Close();
+            }
+            catch (Exception ex)
+            {
+
             }
         }
 
         private async Task ListenForPeers(CancellationToken token)
         {
-            using var udpClient = new UdpClient(DiscoveryPort);
+            using var udpClient = new UdpClient();
+            udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, DiscoveryPort));
 
             while (!token.IsCancellationRequested)
             {
-                var result = await udpClient.ReceiveAsync(token);
-                var message = Encoding.UTF8.GetString(result.Buffer);
-
-                if (message == DiscoveryMessage)
+                try
                 {
-                    var peerAddress = result.RemoteEndPoint.Address.ToString();
+                    var result = await udpClient.ReceiveAsync(token);
 
-                    if (IsLocalAddress(peerAddress)) //check removed for debugging
+                    var json = Encoding.UTF8.GetString(result.Buffer);
+
+                    var message = JsonSerializer.Deserialize<BroadcastData>(json);
+
+                    if (message != null && message.Id == DiscoveryMessage.Id) // Inverse this check to prevent it from detecting itself
                     {
-                        lock (_peerHeartbeats)
-                        {
-                            bool isNew = !_peerHeartbeats.ContainsKey(peerAddress);
-                            _peerHeartbeats[peerAddress] = DateTime.UtcNow;
+                        var peerAddress = message.address.ToString();
 
-                            if (isNew)
+                        if (IsLocalAddress(peerAddress)) //check removed for debugging
+                        {
+                            lock (_peerHeartbeats)
                             {
-                                PeerDiscovered?.Invoke(peerAddress);
-                                Console.WriteLine($"Discovered new peer: {peerAddress}, {DiscoveryMessage}");
+                                var existing = _peerHeartbeats.FirstOrDefault(x => x.Id == message.Id);
+
+                                if (existing == null)
+                                {
+                                    message.TimeStamp = DateTime.UtcNow;
+                                    _peerHeartbeats.Add(message);
+                                    PeerDiscovered?.Invoke(message);
+                                    Console.WriteLine($"Discovered new peer: {DiscoveryMessage.Id}, {DiscoveryMessage.Name}, {DiscoveryMessage.OS}");
+                                }
+                                else
+                                {
+                                    existing.TimeStamp = DateTime.UtcNow;
+                                    existing.address = message.address;
+                                    Console.WriteLine($"Updated peer: {DiscoveryMessage.Id}, {DiscoveryMessage.Name}, {DiscoveryMessage.OS}");
+                                }
                             }
                         }
                     }
                 }
+                catch (SocketException)
+                {
+                    udpClient.Close();
+                }
+                catch (ObjectDisposedException)
+                {
+                    udpClient.Close();
+                }
             }
+            udpClient.Close();
         }
 
         private async Task CleanupPeers(CancellationToken token)
@@ -102,14 +153,14 @@ namespace LanPeer.Workers
 
                 lock (_peerHeartbeats)
                 {
-                    var cutoff = DateTime.UtcNow - TimeSpan.FromSeconds(10);
-                    var inactivePeers = _peerHeartbeats.Where(p => p.Value < cutoff).Select(p => p.Key).ToList();
+                    var cutoff = DateTime.UtcNow - TimeSpan.FromSeconds(30);
+                    var inactivePeers = _peerHeartbeats.Where(p => p.TimeStamp < cutoff).ToList();
 
                     foreach (var peer in inactivePeers)
                     {
                         _peerHeartbeats.Remove(peer);
                         PeerLost?.Invoke(peer);
-                        Console.WriteLine($"Peer removed (inactive): {peer}");
+                        Console.WriteLine($"Peer removed (inactive): {peer.Id}, {peer.Name}, {peer.OS}");
                     }
                 }
             }
@@ -119,6 +170,29 @@ namespace LanPeer.Workers
         {
             var host = Dns.GetHostAddresses(Dns.GetHostName());
             return host.Any(ip => ip.ToString() == address);
+        }
+
+        private static string? GetLocalAddress()
+        {
+            string localIP;
+            try
+            {
+                using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0))
+                {
+                    socket.Connect("8.8.8.8", 65530);
+                    IPEndPoint endPoint = socket.LocalEndPoint as IPEndPoint;
+                    localIP = endPoint.Address.ToString();
+                }
+                if (!string.IsNullOrEmpty(localIP))
+                {
+                    return localIP;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Retrieving Ip failed. Details: " + ex.Message);
+            }
+            return null;
         }
     }
 }
