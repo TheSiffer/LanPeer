@@ -17,5 +17,6 @@ namespace LanPeer.Interfaces
         public void LoadPeersfromSave(List<Peer> peers);
         public void AddPeer(Peer peer);
         public bool DeletePeer(Peer peer);
+        public Peer? GetPeerFromId(string id);
     }
 }

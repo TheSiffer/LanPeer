@@ -17,6 +17,7 @@ namespace LanPeer.Workers
         //private string DiscoveryMessage;
         private BroadcastData DiscoveryMessage;
         private readonly List<BroadcastData> _peerHeartbeats = new(); //keyvalue pairs Ip-timestamp
+        private readonly IConfiguration _config;
         //private readonly List<BroadcastData> peers = new();
         public event Action<BroadcastData>? PeerDiscovered;
         public event Action<BroadcastData>? PeerLost;
@@ -24,9 +25,10 @@ namespace LanPeer.Workers
         public readonly string myId;
 
         //for debugging
-        public DiscoveryWorker()
+        public DiscoveryWorker(IConfiguration config)
         {
-            myId = Guid.NewGuid().ToString();
+            _config = config;
+            myId = _config["Defaults:Id"];
             DiscoveryMessage = new BroadcastData()
             {
                 Id = myId,
@@ -106,11 +108,11 @@ namespace LanPeer.Workers
 
                     var message = JsonSerializer.Deserialize<BroadcastData>(json);
 
-                    if (message != null && message.Id == DiscoveryMessage.Id) // Inverse this check to prevent it from detecting itself
+                    if (message != null && message.Id != DiscoveryMessage.Id) // Inverse this check to prevent it from detecting itself
                     {
                         var peerAddress = message.address.ToString();
 
-                        if (IsLocalAddress(peerAddress)) //check removed for debugging
+                        if (peerAddress != GetLocalAddress()) //check removed for debugging
                         {
                             lock (_peerHeartbeats)
                             {
@@ -121,13 +123,13 @@ namespace LanPeer.Workers
                                     message.TimeStamp = DateTime.UtcNow;
                                     _peerHeartbeats.Add(message);
                                     PeerDiscovered?.Invoke(message);
-                                    Console.WriteLine($"Discovered new peer: {DiscoveryMessage.Id}, {DiscoveryMessage.Name}, {DiscoveryMessage.OS}");
+                                    Console.WriteLine($"Discovered new peer: {message.Id}, {message.Name}, {message.OS}");
                                 }
                                 else
                                 {
                                     existing.TimeStamp = DateTime.UtcNow;
                                     existing.address = message.address;
-                                    Console.WriteLine($"Updated peer: {DiscoveryMessage.Id}, {DiscoveryMessage.Name}, {DiscoveryMessage.OS}");
+                                    Console.WriteLine($"Updated peer: {message.Id}, {message.Name}, {message.OS}");
                                 }
                             }
                         }

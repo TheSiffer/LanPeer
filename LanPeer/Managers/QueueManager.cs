@@ -1,7 +1,9 @@
 ﻿using LanPeer.DataModels;
 using LanPeer.Interfaces;
 using LanPeer.Utility;
+using Microsoft.Extensions.Hosting;
 using System.Collections.Concurrent;
+using System.Runtime;
 using System.Text.Json;
 
 namespace LanPeer.Managers
@@ -26,24 +28,69 @@ namespace LanPeer.Managers
         /// <returns></returns>
         public async Task EnQueue(string filePath)
         {
-            var manifest = ManifestBuilder.Build(filePath);
+            #region Manifest Builder code 
+            //var manifest = ManifestBuilder.Build(filePath);
             //ManifestBuilder.SaveToJson(manifest, filePath); //adds json file to the folder. json extension and broken for files without a folder
-            List<ManifestNode> files = ManifestBuilder.Flatten(manifest);
+            //List<ManifestNode> files = ManifestBuilder.Flatten(manifest);
+            #endregion
 
-            var fileInfo = new FileInfo(filePath);
-            FileTransferItem root = new FileTransferItem
+            if (File.Exists(filePath))
             {
-                FileName = fileInfo.FullName,
-                FullPath = filePath,
-                FileCount = new DirectoryInfo(filePath).GetFiles().Length,
-                FileSize = fileInfo.Length,
-                FileManifest = JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }),
-                SubFiles = files,
-                State = DataModels.Data.TransferState.Pending
-            };
-            _fileQueue.Enqueue(root);
-            //var dataHandler = DataHandler.GetDataHandler();
-            //_fileQueue.Enqueue(item);
+                var fileInfo = new FileInfo(filePath);
+                FileTransferItem root = new FileTransferItem
+                {
+                    FileName = fileInfo.Name,
+                    FullPath = filePath,
+                    //FileCount = new DirectoryInfo(filePath).GetFiles().Length,
+                    FileSize = fileInfo.Length,
+                    //FileManifest = JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }),
+                    //SubFiles = files,
+                    IsFile = true,
+                    State = DataModels.Data.TransferState.Pending
+
+                };
+                _fileQueue.Enqueue(root);
+                //var dataHandler = DataHandler.GetDataHandler();
+                //_fileQueue.Enqueue(item);
+            }
+            else if (Directory.Exists(filePath))
+            {
+                var dirInfo = new DirectoryInfo(filePath);
+                FileTransferItem root = new FileTransferItem
+                {
+                    FileName = dirInfo.Name,
+                    FullPath = filePath,
+                    FileSize = await GetDirectorySizeAsync(filePath),
+                    State = DataModels.Data.TransferState.Pending,
+                    IsFile = true,
+                };
+                _fileQueue.Enqueue(root);
+            }
+        }
+        private async Task<long> GetDirectorySizeAsync(string path, IProgress<double>? progress = null)
+        {
+            return await Task.Run(() =>
+            {
+                long totalSize = 0;
+
+                try
+                {
+                    foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+                    {
+                        try
+                        {
+                            totalSize += new FileInfo(file).Length;
+                        }
+                        catch { /* ignore locked files */ }
+                    }
+                }
+                catch (Exception)
+                {
+                    // Handle unauthorized access etc.
+                }
+
+                return totalSize;
+            });
         }
 
         public ConcurrentQueue<FileTransferItem> GetFileQueue()
@@ -79,6 +126,13 @@ namespace LanPeer.Managers
                 return true;
             }
             return false;
+        }
+        public Peer? GetPeerFromId(string id)
+        {
+            var peer = _peers.FirstOrDefault(p => p.Id == id);
+            if(peer != null) 
+                return peer;
+            return null;
         }
     }
 }

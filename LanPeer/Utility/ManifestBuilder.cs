@@ -1,11 +1,13 @@
 ﻿using LanPeer.DataModels;
 using System.Security.Cryptography;
-
 using System.Text.Json;
 
 
 namespace LanPeer.Utility
 {
+    /// <summary>
+    /// Unused class
+    /// </summary>
     public static class ManifestBuilder
     {
         /// <summary>
