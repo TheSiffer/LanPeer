@@ -61,10 +61,10 @@ namespace LanPeer
         #endregion
 
         [HttpPost("{id:guid}")]
-        public IActionResult ConnectToPeer(Guid id)
+        public async Task<ActionResult> ConnectToPeer(Guid id)
         {
             var peer = queueManager.GetPeerFromId(id.ToString());
-            if (peer != null && connManager.ConnectToPeer(peer))
+            if (peer != null && await connManager.ConnectToPeer(peer))
             {
                 return Ok(true);
             }

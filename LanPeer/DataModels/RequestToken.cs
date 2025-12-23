@@ -14,6 +14,8 @@ namespace LanPeer.DataModels
 
         public int CommsPort { get; set; }
 
+        public int TransPort { get; set; }
+
         public int Code { get; set; }
 
         public string IpAddress { get; set; } = string.Empty;

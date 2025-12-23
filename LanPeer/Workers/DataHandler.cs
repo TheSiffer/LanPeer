@@ -3,6 +3,7 @@ using LanPeer.DataModels.Data;
 using LanPeer.Helpers;
 using LanPeer.Interfaces;
 using System.ComponentModel.DataAnnotations;
+using System.Formats.Tar;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
@@ -23,12 +24,10 @@ namespace LanPeer.Workers
         private string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "LanPeer");
         private string tempPath; //asign default here
         private string zipPrefix = "Compressed - ";
-        private string[] compressedExts = { ".zip", ".exe", ".jpg", ".png", ".mp4", ".avi" };
-        public event Action<bool>? IsZipped;
+        private readonly string[] compressedExts = { ".zip", ".exe", ".jpg", ".png", ".mp4", ".avi" };
+        public event Action<bool>? IsPacked;
         public event Action<bool>? IsExtracted;
-
         private readonly IQueueManager _queueManager;
-
         private static Queue<FileTransferItem> fileQueue = new Queue<FileTransferItem>();
 
         private CancellationToken token;
@@ -53,6 +52,18 @@ namespace LanPeer.Workers
                     catch { }
                 }
                 _stream = stream;
+            }
+        }
+        public async Task<bool> DisposeStream()
+        {
+            lock (_lock)
+            {
+                if(_stream != null)
+                {
+                    _stream.DisposeAsync();
+                    return true;
+                }
+                return true;
             }
         }
 
@@ -105,12 +116,8 @@ namespace LanPeer.Workers
                 item = file;
 
                 int chunkIndex = 0;
-                //string fileName = file.FileName;
-                //string relPath = file.DestPath; // where the file is headed
-                //string fullPath = file.FullPath; //full path to the actual file/folder
-                //TransferState fileState = file.State;
-                //string fileHash;
-                Directory.CreateDirectory(tempPath);
+                var files = Directory.GetFiles(file.FullPath);
+
                 string zipName = string.Concat(zipPrefix, file.FileName, ".zip");
                 string zipPath = Path.Combine(tempPath, zipName); //temp\zipname.zip
                 //long fileSize = file.FileSize;
@@ -137,7 +144,6 @@ namespace LanPeer.Workers
                     //Manifest = file.SubFiles,
                 };
                 var json = JsonSerializer.Serialize(metadata);
-                //var metadata = $"{fileName}|{fileSize}|{fileHash}|{totalChunks}|{fileState}";
 
                 byte[] metaBytes = Encoding.UTF8.GetBytes(json);  // + "\n" removed
 
@@ -205,7 +211,7 @@ namespace LanPeer.Workers
                     using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
                     var ackPacket = _stream.DeserializeAck();
 
-                    if(ackPacket.State == TransferState.Verified)
+                    if (ackPacket.State == TransferState.Verified)
                     {
                         Console.WriteLine($"[SendFile] Receiver confirmed file {file.FileName}");
                         file.IsVerified = true;
@@ -342,45 +348,45 @@ namespace LanPeer.Workers
                 Data = Array.Empty<byte>(),
             };
         }
-        private async Task CreateZip(string path, string dest)
+        private async Task CreateZip(string path, string dest) // we doin tar now.
         {
             await Task.Run(() => {
                 if (Directory.Exists(path))
                 {
-                    ZipFile.CreateFromDirectory(path, dest, CompressionLevel.NoCompression, includeBaseDirectory: true);
+                    TarFile.CreateFromDirectory(path, dest, includeBaseDirectory: true);
                 }
                 else if (File.Exists(path)) // stupid shit because Zipfile cant archive a single file without bitching.
                 {
-                    if (compressedExts.Contains(Path.GetExtension(path).ToLower())) //no need to waste cpu on already bundled files
+                    //if (compressedExts.Contains(Path.GetExtension(path).ToLower())) //no need to waste cpu on already bundled files
+                    //{
+                    using (FileStream fs = new FileStream(dest, FileMode.Create))
                     {
-                        using (FileStream fs = new FileStream(dest, FileMode.Create))
+                        using (TarWriter tar = new TarWriter(fs))
                         {
-                            using (ZipArchive arch = new ZipArchive(fs, ZipArchiveMode.Create))
-                            {
-                                arch.CreateEntryFromFile(path, Path.GetFileName(path), CompressionLevel.NoCompression); //takes a while otherwise
-                            }
+                            tar.WriteEntry(path, Path.GetFileName(path)); //takes a while otherwise
                         }
                     }
-                    else
-                    {
-                        using (FileStream fs = new FileStream(dest, FileMode.Create))
-                        {
-                            using (ZipArchive arch = new ZipArchive(fs, ZipArchiveMode.Create))
-                            {
-                                arch.CreateEntryFromFile(path, Path.GetFileName(path), CompressionLevel.NoCompression); // this might take a little while
-                            }
-                        }
-                    }
+                    //}
+                    //else
+                    //{
+                    //    using (FileStream fs = new FileStream(dest, FileMode.Create))
+                    //    {
+                    //        using (ZipArchive arch = new ZipArchive(fs, ZipArchiveMode.Create))
+                    //        {
+                    //            arch.CreateEntryFromFile(path, Path.GetFileName(path), CompressionLevel.NoCompression); // this might take a little while
+                    //        }
+                    //    }
+                    //}
                 }
             });
-            IsZipped?.Invoke(true);
+            IsPacked?.Invoke(true);
         }
         
         private async Task ExtractZip(string path, string dest)
         {
             await Task.Run(() =>
             {
-                ZipFile.ExtractToDirectory(path, dest);
+                TarFile.ExtractToDirectory(path, dest, overwriteFiles: false);
             });
             IsExtracted?.Invoke(true);
         }

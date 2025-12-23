@@ -9,6 +9,7 @@ namespace LanPeer.Interfaces
 {
     public interface IConnectionManager
     {
-        public bool ConnectToPeer(Peer peer);
+        public Task<bool> ConnectToPeer(Peer peer);
+        public Task StartFtpServerForPeer(Peer peer, string downloadFolder);
     }
 }

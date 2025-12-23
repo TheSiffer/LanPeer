@@ -5,6 +5,9 @@ using System.Net.WebSockets;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using LanPeer.Managers;
+using FubarDev.FtpServer;
+using FubarDev.FtpServer.FileSystem.DotNet;
+using System.Net;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +18,11 @@ builder.Services.AddSingleton<IDataHandler, DataHandler>();
 builder.Services.AddSingleton<IConnectionManager, ConnectionManager>();
 builder.Services.AddSingleton<IQueueManager, QueueManager>();
 builder.Services.AddSingleton<ICodeManager, CodeManager>();
+
+builder.Services.Configure<DotNetFileSystemOptions>(opt => opt.RootPath = Path.Combine(Path.GetTempPath(), "TestFtpServer"));
+
+builder.Services.AddFtpServer(builder => builder.UseDotNetFileSystem().EnableAnonymousAuthentication()); //remove anonymous auth in prod
+builder.Services.Configure<FtpServerOptions>(opt => opt.ServerAddress = null); //do your own thing
 
 // Add services (dont create new instance for bg service for some, use their instance created for DI)
 builder.Services.AddHostedService(provider => (DiscoveryWorker)provider.GetRequiredService<IDiscoveryWorker>());

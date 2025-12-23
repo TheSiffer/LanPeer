@@ -10,6 +10,7 @@ namespace LanPeer.Interfaces
     public interface IDiscoveryWorker
     {
         public string GetMyId();
+        public string GetMyAddress();
         public List<BroadcastData> GetPeers();
     }
 }

@@ -21,20 +21,21 @@ namespace LanPeer.Workers
         //private readonly List<BroadcastData> peers = new();
         public event Action<BroadcastData>? PeerDiscovered;
         public event Action<BroadcastData>? PeerLost;
-
-        public readonly string myId;
+        private readonly string IpAddress;
+        private readonly string myId;
 
         //for debugging
         public DiscoveryWorker(IConfiguration config)
         {
             _config = config;
             myId = _config["Defaults:Id"];
+            IpAddress = GetLocalAddress() ?? new string("0.0.0.0");
             DiscoveryMessage = new BroadcastData()
             {
                 Id = myId,
                 Name = Environment.MachineName,
                 OS = Environment.OSVersion.ToString(),
-                address = GetLocalAddress() ?? new string("0.0.0.0")
+                address = IpAddress
             };
 
             //DiscoveryMessage = $"LanTransfer-Discovery {myId}";
@@ -48,6 +49,10 @@ namespace LanPeer.Workers
         public string GetMyId()
         {
             return myId;
+        }
+        public string GetMyAddress()
+        {
+            return IpAddress;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
