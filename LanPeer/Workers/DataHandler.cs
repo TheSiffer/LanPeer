@@ -1,4 +1,5 @@
-﻿using LanPeer.DataModels;
+﻿using FluentFTP;
+using LanPeer.DataModels;
 using LanPeer.DataModels.Data;
 using LanPeer.Helpers;
 using LanPeer.Interfaces;
@@ -29,6 +30,7 @@ namespace LanPeer.Workers
         public event Action<bool>? IsExtracted;
         private readonly IQueueManager _queueManager;
         private static Queue<FileTransferItem> fileQueue = new Queue<FileTransferItem>();
+        private FtpClient? _ftpClient;
 
         private CancellationToken token;
 
@@ -54,7 +56,7 @@ namespace LanPeer.Workers
                 _stream = stream;
             }
         }
-        public async Task<bool> DisposeStream()
+        public bool DisposeStream()
         {
             lock (_lock)
             {
@@ -62,6 +64,36 @@ namespace LanPeer.Workers
                 {
                     _stream.DisposeAsync();
                     return true;
+                }
+                return true;
+            }
+        }
+        public void SetFtpClient(FtpClient client)
+        {
+            lock (_lock)
+            {
+                if (_ftpClient != null)
+                {   try
+                    {
+                        _ftpClient.Dispose();
+                    }
+                    catch { }
+                }
+                _ftpClient = client;
+            }
+        }
+        public bool DisposeFtpClient()
+        {
+            lock (_lock)
+            {
+                if(_ftpClient != null)
+                {
+                    try
+                    {
+                        _ftpClient.Dispose();
+                        return true;
+                    }
+                    catch { }
                 }
                 return true;
             }

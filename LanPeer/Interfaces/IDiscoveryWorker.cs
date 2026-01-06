@@ -12,5 +12,6 @@ namespace LanPeer.Interfaces
         public string GetMyId();
         public string GetMyAddress();
         public List<BroadcastData> GetPeers();
+        public BroadcastData? GetPeerFromAddress(string ipAddress);
     }
 }

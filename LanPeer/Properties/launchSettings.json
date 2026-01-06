@@ -4,6 +4,7 @@
     "LanPeer": {
       "commandName": "Project",
       "dotnetRunMessages": true,
+      "launchBrowser": true,
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }

@@ -45,6 +45,16 @@ namespace LanPeer.Workers
         {
             return _peerHeartbeats;
         }
+        [Obsolete]
+        public BroadcastData GetPeerFromAddress(string ipAddress) //not a reliable way to check peers since ip changes are frequent
+        {
+            if (!string.IsNullOrEmpty(ipAddress))
+            {
+                return _peerHeartbeats.First(x => x.address == ipAddress);
+            }
+            return new BroadcastData();
+        }
+            
 
         public string GetMyId()
         {
@@ -113,11 +123,11 @@ namespace LanPeer.Workers
 
                     var message = JsonSerializer.Deserialize<BroadcastData>(json);
 
-                    if (message != null && message.Id != DiscoveryMessage.Id) // Inverse this check to prevent it from detecting itself
+                    if (message != null && message.Id == DiscoveryMessage.Id) // Inverse this check to prevent it from detecting itself
                     {
                         var peerAddress = message.address.ToString();
 
-                        if (peerAddress != GetLocalAddress()) //check removed for debugging
+                        if (peerAddress == GetLocalAddress()) //check removed for debugging
                         {
                             lock (_peerHeartbeats)
                             {

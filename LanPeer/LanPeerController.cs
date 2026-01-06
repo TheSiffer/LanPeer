@@ -1,4 +1,5 @@
 ﻿using LanPeer.DataModels;
+using LanPeer.DataModels.Data;
 using LanPeer.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -61,10 +62,10 @@ namespace LanPeer
         #endregion
 
         [HttpPost("{id:guid}")]
-        public async Task<ActionResult> ConnectToPeer(Guid id)
+        public async Task<ActionResult> ConnectToPeer(Guid id, [FromQuery] TransferMode mode)
         {
             var peer = queueManager.GetPeerFromId(id.ToString());
-            if (peer != null && await connManager.ConnectToPeer(peer))
+            if (peer != null && await connManager.ConnectToPeer(peer, mode))
             {
                 return Ok(true);
             }

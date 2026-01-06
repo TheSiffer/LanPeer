@@ -1,4 +1,6 @@
-﻿using LanPeer.DataModels;
+﻿using FubarDev.FtpServer;
+using LanPeer.DataModels;
+using LanPeer.DataModels.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +11,9 @@ namespace LanPeer.Interfaces
 {
     public interface IConnectionManager
     {
-        public Task<bool> ConnectToPeer(Peer peer);
-        public Task StartFtpServerForPeer(Peer peer, string downloadFolder);
+        public Task<bool> InitiateAuth(string address, int code);
+        public Task<bool> ConnectToPeer(Peer peer, TransferMode mode);
+        public Task<bool> ChangeTransferMode(TransferMode mode, Peer peer);
+        public List<IFtpConnection> GetActiveConnections();
     }
 }

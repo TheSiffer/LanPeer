@@ -8,6 +8,8 @@ using LanPeer.Managers;
 using FubarDev.FtpServer;
 using FubarDev.FtpServer.FileSystem.DotNet;
 using System.Net;
+using Microsoft.Extensions.Options;
+using FubarDev.FtpServer.AccountManagement;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +20,10 @@ builder.Services.AddSingleton<IDataHandler, DataHandler>();
 builder.Services.AddSingleton<IConnectionManager, ConnectionManager>();
 builder.Services.AddSingleton<IQueueManager, QueueManager>();
 builder.Services.AddSingleton<ICodeManager, CodeManager>();
+builder.Services.AddSingleton<MembershipManager>();
+builder.Services.AddSingleton<IMembershipProvider>
+    (
+    sp=> sp.GetRequiredService<MembershipManager>());
 
 builder.Services.Configure<DotNetFileSystemOptions>(opt => opt.RootPath = Path.Combine(Path.GetTempPath(), "TestFtpServer"));
 
@@ -29,13 +35,12 @@ builder.Services.AddHostedService(provider => (DiscoveryWorker)provider.GetRequi
 //builder.Services.AddHostedService<PeerHandshake>();
 builder.Services.AddHostedService(provider => (DataHandler)provider.GetRequiredService<IDataHandler>());
 builder.Services.AddHostedService(provider => (ConnectionManager)provider.GetRequiredService<IConnectionManager>());
-builder.Services.AddHostedService<Worker>();
+//builder.Services.AddHostedService<Worker>();
 
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
 
 builder.WebHost.ConfigureKestrel(options =>
 {
@@ -49,11 +54,31 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI();  
 }
 
 app.UseHttpsRedirection();
 // Map controllers
 app.MapControllers();
+
+//app.Lifetime.ApplicationStarted.Register(() =>
+//{
+//    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+//    var urls = app.Urls;
+//    logger.LogInformation("Application is listening on the following URLs:");
+//    foreach (var url in urls)
+//    {
+//        logger.LogInformation("   : {Url}", url);
+//    }
+
+//    // Also log for console visibility
+//    Console.WriteLine("\n=======================================");
+//    Console.WriteLine("Application URLs:");
+//    foreach (var url in urls)
+//    {
+//        Console.WriteLine($"   : {url}");
+//    }
+//    Console.WriteLine("=======================================\n");
+//});
 
 app.Run();

@@ -102,6 +102,13 @@ namespace LanPeer.Managers
         {
             return _peers.Contains(peer);
         }
+        public bool PeerExists(string Id)
+        {
+            if(string.IsNullOrEmpty(Id)) 
+                return false;
+
+            return _peers.Where(x => x.Id ==  Id).Any();
+        }
 
         public List<Peer> GetSavedPeers()
         {
