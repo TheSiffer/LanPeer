@@ -1,7 +1,7 @@
 ﻿using LanPeer.Interfaces;
 using System;
 using System.Timers;
-namespace LanPeer
+namespace LanPeer.Managers
 {
     public sealed class CodeManager : ICodeManager
     {
@@ -10,7 +10,7 @@ namespace LanPeer
 
         //public static CodeManager? instance; //=> _instance.Value;
 
-        private string currentCode = "";
+        private string currentCode = string.Empty;
         private readonly System.Timers.Timer timer;
         private readonly Random random = new Random();
         private readonly object _lock = new();
@@ -21,22 +21,28 @@ namespace LanPeer
 
         public CodeManager()
         {
-            GenerateNewCode();
-            timer = new System.Timers.Timer(200000); //20 secs
+
+            timer = new System.Timers.Timer(30000); //30 secs
             timer.Elapsed += (s, e) => GenerateNewCode();
             timer.AutoReset = true;
             timer.Start();
+            GenerateNewCode();
         }
 
-        private void GenerateNewCode()
+        private async Task GenerateNewCode()
         {
-            lock (_lock)
+            await Task.Run(() =>
             {
-                currentCode = random.Next(1000, 9999).ToString();
-                LastGeneratedAt = DateTime.UtcNow;
-                OnCodeExpired?.Invoke(currentCode); //fire event to alert subscribers
-                Console.WriteLine($"[CodeManager] New code generated: {currentCode}");
-            }
+                lock (_lock)
+                {
+                    currentCode = random.Next(1000, 9999).ToString();
+                    LastGeneratedAt = DateTime.UtcNow;
+                    OnCodeExpired?.Invoke(currentCode); //fire event to alert subscribers
+                    Console.WriteLine($"[CodeManager] New code generated: {currentCode}");
+                    timer.Stop();
+                    timer.Start();
+                }
+            });
         }
 
         public string GetCode()
@@ -55,9 +61,9 @@ namespace LanPeer
             }
         }
 
-        public string ForceRegenerate()
+        public async Task<string> ForceRegenerate()
         {
-            GenerateNewCode();
+            await GenerateNewCode();
             return currentCode;
         }
     }

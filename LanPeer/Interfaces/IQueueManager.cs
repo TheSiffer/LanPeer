@@ -13,9 +13,11 @@ namespace LanPeer.Interfaces
         public Task EnQueue(string filePath);
         public ConcurrentQueue<FileTransferItem> GetFileQueue();
         public bool PeerExists(Peer peer);
+        public bool PeerExists(string Id);
         public List<Peer> GetSavedPeers();
         public void LoadPeersfromSave(List<Peer> peers);
         public void AddPeer(Peer peer);
         public bool DeletePeer(Peer peer);
+        public Peer? GetPeerFromId(string id);
     }
 }

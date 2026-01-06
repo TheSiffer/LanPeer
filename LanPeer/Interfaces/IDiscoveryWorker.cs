@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LanPeer.DataModels;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,6 +9,9 @@ namespace LanPeer.Interfaces
 {
     public interface IDiscoveryWorker
     {
-        public Dictionary<string, DateTime> GetPeers();
+        public string GetMyId();
+        public string GetMyAddress();
+        public List<BroadcastData> GetPeers();
+        public BroadcastData? GetPeerFromAddress(string ipAddress);
     }
 }

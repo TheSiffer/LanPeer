@@ -6,15 +6,11 @@ using System.Threading.Tasks;
 
 namespace LanPeer.DataModels
 {
-    public class Peer
+    public class AuthResponse
     {
-        public string Id { get; set; }  = string.Empty;
-
         public string Name { get; set; } = string.Empty;
-
-        public string IpAddress { get; set; } = string.Empty;
-
-        public int CommsPort { get; set; } 
+        public string Status { get; set; } = string.Empty;
+        public int CommsPort { get; set; }
         public int TransPort { get; set; }
     }
 }

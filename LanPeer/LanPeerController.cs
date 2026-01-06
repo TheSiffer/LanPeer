@@ -1,6 +1,8 @@
 ﻿using LanPeer.DataModels;
+using LanPeer.DataModels.Data;
 using LanPeer.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using System;
 
 
 namespace LanPeer
@@ -12,13 +14,15 @@ namespace LanPeer
         private readonly IDataHandler dataHandler;
         private readonly IConnectionManager connManager;
         private readonly ICodeManager codeManager;
+        private readonly IQueueManager queueManager;
 
         //need interfaces here to call the independentely running services.
-        public LanPeerController(IDataHandler _dataHandler, IConnectionManager _connManager, ICodeManager _codeManager)
+        public LanPeerController(IDataHandler _dataHandler, IConnectionManager _connManager, ICodeManager _codeManager, IQueueManager _queueManager)
         {
             dataHandler = _dataHandler;
             connManager = _connManager;
             codeManager = _codeManager;
+            queueManager = _queueManager;
         }
         #region AuthCode
         
@@ -31,12 +35,12 @@ namespace LanPeer
         }
 
         [HttpGet("forceregen")]
-        public IActionResult ForceRegenerateCode()
+        public async Task<IActionResult> ForceRegenerateCode()
         {
             string code = string.Empty;
             try
             {
-                code = codeManager.ForceRegenerate();
+                code = await codeManager.ForceRegenerate();
             }
             catch (Exception ex)
             {
@@ -57,10 +61,11 @@ namespace LanPeer
         }
         #endregion
 
-        [HttpPost("peer")]
-        public IActionResult ConnectToPeer(Peer peer)
+        [HttpPost("{id:guid}")]
+        public async Task<ActionResult> ConnectToPeer(Guid id, [FromQuery] TransferMode mode)
         {
-            if (connManager.ConnectToPeer(peer))
+            var peer = queueManager.GetPeerFromId(id.ToString());
+            if (peer != null && await connManager.ConnectToPeer(peer, mode))
             {
                 return Ok(true);
             }
@@ -79,18 +84,21 @@ namespace LanPeer
             }
             return BadRequest();
         }
+
         [HttpPost("size")]
-        public IActionResult SetBufferSize(int size)
+        public IActionResult SetBufferSize([FromBody] int size)
         {
             dataHandler.SetBufferSize(size);
             return Ok();
         }
+
         [HttpGet("buffersize")]
         public IActionResult GetBufferSize()
         {
             int size = dataHandler.GetBufferSize();
             return Ok(size);
         }
+
         [HttpPost("begintransfer")]
         public async Task<IActionResult> SendFilesAsync()
         {
@@ -98,6 +106,53 @@ namespace LanPeer
             return Ok();
         }
 
+        #endregion
+
+        #region Queue
+        [HttpPost("path")]
+        public async Task<IActionResult> EnqueueFile(string path)
+        {
+            await queueManager.EnQueue(path);
+            return Ok();
+        }
+
+        [HttpGet("queue")]
+        public IActionResult GetQueuedFiles()
+        {
+            var queue = queueManager.GetFileQueue();
+            return Ok(queue);
+        }
+
+        [HttpGet("peer/{id:guid}")]
+        public IActionResult PeerExists(Guid id)
+        {
+            var peer = queueManager.GetPeerFromId(id.ToString());
+            if (peer != null)
+            {
+                return Ok(peer);
+            }
+            return BadRequest();
+        }
+
+        [HttpGet("peers")]
+        public IActionResult GetPeers()
+        {
+            return Ok(queueManager.GetSavedPeers());
+        }
+
+        [HttpPost("peer")]
+        public IActionResult AddPeer(Peer peer)
+        {
+            queueManager.AddPeer(peer);
+            return Ok(peer);
+        }
+
+        [HttpDelete("peer")]
+        public IActionResult RemovePeer(Peer peer)
+        {
+            queueManager.DeletePeer(peer);
+            return Ok(peer);
+        }
         #endregion
     }
 
